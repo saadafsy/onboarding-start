@@ -22,6 +22,11 @@ module spi_peripheral (
     reg [2:0] ncs_sync;
     reg [1:0] copi_sync;
 
+    wire sclk_rise  = sclk_sync[1] & ~sclk_sync[2];
+    wire ncs_rise   = ncs_sync[1]  & ~ncs_sync[2];
+    wire ncs_active = ~ncs_sync[1];
+    wire copi_bit   = copi_sync[1];
+
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             sclk_sync       <= 3'b000;
