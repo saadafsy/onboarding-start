@@ -30,6 +30,14 @@ module spi_peripheral (
     reg [15:0] shift_reg;
     reg [4:0]  bit_count;
 
+    localparam [6:0] max_address = 7'h04;
+
+    wire       rw_bit  = shift_reg[15];
+    wire [6:0] address = shift_reg[14:8];
+    wire [7:0] data    = shift_reg[7:0];
+
+    wire transaction_valid = (bit_count == 5'd16) && rw_bit && (address <= max_address);
+
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             sclk_sync       <= 3'b000;
@@ -54,6 +62,17 @@ module spi_peripheral (
                 end
             end else begin
                 bit_count <= 5'd0;
+            end
+
+            if (ncs_rise && transaction_valid) begin
+                case (address)
+                    7'h00: en_reg_out_7_0  <= data;
+                    7'h01: en_reg_out_15_8 <= data;
+                    7'h02: en_reg_pwm_7_0  <= data;
+                    7'h03: en_reg_pwm_15_8 <= data;
+                    7'h04: pwm_duty_cycle  <= data;
+                    default: ;
+                endcase
             end
         end
     end
