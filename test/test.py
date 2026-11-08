@@ -188,5 +188,44 @@ async def test_pwm_freq(dut):
 
 @cocotb.test()
 async def test_pwm_duty(dut):
-    # Write your test here
+    dut._log.info("Start PWM duty cycle test")
+
+    clock = Clock(dut.clk, 100, units="ns")
+    cocotb.start_soon(clock.start())
+
+    dut.ena.value = 1
+    dut.ui_in.value = ui_in_logicarray(1, 0, 0)
+    dut.rst_n.value = 0
+    await ClockCycles(dut.clk, 5)
+    dut.rst_n.value = 1
+    await ClockCycles(dut.clk, 5)
+
+    await send_spi_transaction(dut, 1, 0x00, 0x01)
+    await send_spi_transaction(dut, 1, 0x02, 0x01)
+
+    await send_spi_transaction(dut, 1, 0x04, 0x00)
+    for i in range(4000):
+        await ClockCycles(dut.clk, 1)
+        assert (int(dut.uo_out.value) & 1) == 0, "output should be 0 at 0% duty"
+    dut._log.info("0% duty ok")
+
+    await send_spi_transaction(dut, 1, 0x04, 0xFF)
+    for i in range(4000):
+        await ClockCycles(dut.clk, 1)
+        assert (int(dut.uo_out.value) & 1) == 1, "output should be 1 at 100% duty"
+    dut._log.info("100% duty ok")
+
+    for duty in [0x20, 0x40, 0x80, 0xC0]:
+        await send_spi_transaction(dut, 1, 0x04, duty)
+
+        await wait_for_pwm(dut, 0)
+        t_rise = await wait_for_pwm(dut, 1)
+        t_fall = await wait_for_pwm(dut, 0)
+        t_rise2 = await wait_for_pwm(dut, 1)
+
+        measured = (t_fall - t_rise) / (t_rise2 - t_rise) * 100
+        expected = duty / 256 * 100
+        dut._log.info(f"duty {duty}: measured {measured}%, expected {expected}%")
+        assert abs(measured - expected) <= 1, f"duty {measured}% should be {expected}%"
+
     dut._log.info("PWM Duty Cycle test completed successfully")
