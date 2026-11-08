@@ -149,9 +149,40 @@ async def test_spi(dut):
 
     dut._log.info("SPI test completed successfully")
 
+async def wait_for_pwm(dut, value):
+    for i in range(10000):
+        await ClockCycles(dut.clk, 1)
+        if (int(dut.uo_out.value) & 1) == value:
+            return cocotb.utils.get_sim_time(units="ns")
+    assert False, f"timed out waiting for uo_out[0] = {value}"
+
 @cocotb.test()
 async def test_pwm_freq(dut):
-    # Write your test here
+    dut._log.info("Start PWM frequency test")
+
+    clock = Clock(dut.clk, 100, units="ns")
+    cocotb.start_soon(clock.start())
+
+    dut.ena.value = 1
+    dut.ui_in.value = ui_in_logicarray(1, 0, 0)
+    dut.rst_n.value = 0
+    await ClockCycles(dut.clk, 5)
+    dut.rst_n.value = 1
+    await ClockCycles(dut.clk, 5)
+
+    await send_spi_transaction(dut, 1, 0x00, 0x01)
+    await send_spi_transaction(dut, 1, 0x02, 0x01)
+    await send_spi_transaction(dut, 1, 0x04, 0x80)
+
+    await wait_for_pwm(dut, 0)
+    t1 = await wait_for_pwm(dut, 1)
+    await wait_for_pwm(dut, 0)
+    t2 = await wait_for_pwm(dut, 1)
+
+    freq = 1e9 / (t2 - t1)
+    dut._log.info(f"PWM frequency: {freq} Hz")
+    assert 2970 <= freq <= 3030, f"frequency {freq} Hz not in 2970-3030 Hz"
+
     dut._log.info("PWM Frequency test completed successfully")
 
 
